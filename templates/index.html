@@ -1,0 +1,24 @@
+{% extends 'skeleton.html' %}
+{% block js %}
+    function createNew()  {
+        name = $('#db_name').val()
+        if (!name)  {
+            return;
+        }
+        window.location.href = '{% url db_design 'dummy' %}'.replace('dummy', name);
+        return false;
+    }
+{% endblock %}
+{% block content %}
+    <h1>Databases</h1>
+    <ul>
+        {% for db in dbs %}
+            <li><a href="{% url db_view db.name %}">{{ db.name }}</a>&nbsp;<a href="{% url db_design db.name %}">[design]</a></li>
+        {% endfor %}
+    </ul>
+    <strong>Create new</strong>
+    <form onsubmit="return createNew()">
+    <input id="db_name" type="text" name="db_name" />
+    <input type="submit" value="go!"/>
+    </form>
+{% endblock %}

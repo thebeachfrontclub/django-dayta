@@ -1,0 +1,172 @@
+{% extends 'skeleton.html' %}
+{% load dict %}
+{% block js %}
+    {% if design_mode %}
+    design_mode  = true;
+    {% else %}
+    design_mode = false;
+    {% endif %}
+
+    $(function() { 
+        var input_form = $('form.input');
+        var input_form_cache = input_form.html();
+        $(document).keyup(function(e) { 
+            //if (e.which == 13) { $('.save').click(); }    // enter (works as expected)
+            if (e.keyCode == 27) { $(window).trigger('form.insert_mode'); }
+        });
+        table_el = $('table.data');
+        $(window).bind('data.add', function()  {
+            $('tr').not('tr:first').each(function() { 
+                if (!$(this).data('delete_btn')) { 
+                    $('td.actions', this).append('<a href="javascript:;" onclick="deleteRow(this.parentNode.parentNode);">delete</a>');
+                    $(this).data('delete_btn', true);
+                }
+                if (!$(this).data('modify_btn')) {
+                    $('td.actions', this).append(' / <a href="javascript:;" onclick="modifyRow(this.parentNode.parentNode);">modify</a>');
+                    $(this).data('modify_btn', true);
+                }
+            });
+        });
+        {% if design_mode %}
+        $(window).bind('data.remove', function() {
+            var l = $('tr').not('tr:first');
+            for (var i=0;i<l.length;i++) { 
+                l[i].id = '_design_field_' + i;
+            }
+        });
+        {% endif %}
+        $(window).trigger('data.add');
+
+        var TDs = $('tr:first td.field');
+        var rows = new Array(TDs.length);
+        for (var i=0; i < TDs.length; i++)  {
+            rows[i] = TDs[i].innerHTML;
+        }
+
+        data_table = {
+                        el: table_el,
+                        addRow: function(obj)  {
+                            var h = new Array();
+                            h.push('<tr id="' + obj.id + '">');
+                            for (var k in obj.data) {
+                                h.push('<td></td>');
+                            }
+                            h.push('<td class="actions"></td>');
+                            h.push('<td class="signature">' + obj.signature + '</td>');
+                            h.push('</tr>');
+                            this.el.append(h.join(''));
+                            data_table.updateRow($('tr:last', this.el), obj);
+                            $(window).trigger('data.add');
+                        },
+                        updateRow: function(row, obj)  {
+                            var i = 0;
+                            for (var k in obj.data)  {
+                                for (var i=0; i< rows.length; i++)  {
+                                    if ((k) == rows[i])
+                                        break;
+                                }
+                                $('td', row)[i].innerHTML = obj.data[k];
+                            }
+                        },
+                        deleteRow: function(row)  {
+                            $(row).remove();
+                        }
+                     }
+
+        deleteRow = function(row)  {
+            var method = 'db.remove'
+            {% if design_mode %}
+                method += '_field';
+            {% endif %}
+            $.jsonRPC.request(method, {db_name: '{{ db.name }}', entry_id: row.id}, {
+                success: function(resp)  {
+                    if (resp.result.ok == 1)  {
+                        data_table.deleteRow(row);
+                        $(window).trigger('data.remove');
+                    }
+                }
+            });
+        }
+
+        modifyRow = function(row)  {
+            $(window).trigger('form.insert_mode');
+            var method = 'form.update'
+            window.entry_id = row.id;
+            $.jsonRPC.request(method, {db_name: '{{ db.name }}', entry_id: row.id, design_mode: design_mode}, {
+                success: function(resp)  {
+                    input_form.html(resp.result);
+                    $(window).trigger('form.reload');
+                    $(window).trigger('form.update_mode');
+                    $(row).css('background-color', 'red');
+                }
+            });
+        }
+        $('form.input').submit(function()  {
+            var method = 'db.update'
+            var entry_id = window.entry_id;
+            $.jsonRPC.request(method, {db_name: '{{ db.name }}', dct: $(this).serializeArray(), entry_id: entry_id, design_mode: design_mode}, {
+                success: function(resp) { 
+                    if (resp.result.ok == 0)  {
+                        input_form.html(resp.result.form);
+                        $(window).trigger('form.reload');
+                    } else {
+                        if (entry_id)  {
+                            data_table.updateRow($('#' + entry_id), resp.result);
+                        } else {
+                            data_table.addRow(resp.result);
+                            $('div#div_data').attr('scrollTop', 9999999);
+                        }
+                        $(window).trigger('form.insert_mode');
+                    }
+                }
+            });
+            return false;
+        });
+        $(window).bind('form.reload', function() { 
+            input_form.append('<input type="submit" />');
+        }).trigger('form.reload');
+        $(window).bind('form.update_mode', function() {
+            $('.form_action').html('Update');
+            $(document.body).css('background-color', 'yellow')
+        });
+        $(window).bind('form.insert_mode', function()  {
+            window.entry_id = null;
+            $('.form_action').html('Add');
+            $(document.body).css('background-color', 'white')
+            $('tr').css('background-color', '');
+            input_form.html(input_form_cache);
+            $(window).trigger('form.reload');
+            $('input:first', input_form).focus();
+        });
+    });
+{% endblock %}
+{% block content %}
+    <h1>{{ db.name }}</h1>
+    <div id="div_data" style="height: 75%; overflow:scroll">
+        <table class="data"border="1">
+            <tr>
+                {% for field in db.field_list %}
+                    <td class="field">{{ field.name }}</td>
+                {% endfor %}
+                <td>Actions</td>
+                <td>Signature</td>
+            </tr>
+            {% for entry in entries %}
+            <tr id="{{ entry.id }}">
+                {% for field in db.field_list %}
+                    <td>{{ entry.data|get:field.name }}</td>
+                {% endfor %}
+                <td class="actions"></td>
+                <td class="signature">{{ entry.signature }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    <div style="height: 25%; border: 1px black solid;">
+        <strong class="form_action">Add</strong>
+        <hr/>
+        <form class="input">
+            {{ db.as_form.as_ul }}
+        </form>
+    </div>
+{% endblock %}

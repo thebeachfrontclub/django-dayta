@@ -1,0 +1,9 @@
+{% extends 'skeleton.html' %}
+{% block content %}
+<h1>Please sign</h1>
+<p>Please choose a signature for your entries</p>
+<form method="POST">
+    <input type="text" name="signature"/>
+    {% csrf_token %}
+</form>
+{% endblock %}
