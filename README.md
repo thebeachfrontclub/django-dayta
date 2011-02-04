@@ -1,6 +1,6 @@
  # django-dayta
 
- A simple replacement to XLS as a database, initially developed for the internal purposes of [The Beachfront Club](http://www.thebeachfrontclub.com).
+ A simple replacement to XLS as a database that allows simple data entry systems to be created by non technical staff. Initially developed for the internal purposes of [The Beachfront Club](http://www.thebeachfrontclub.com).
 
  Requires a [mongo](http://www.mongodb.org) database server.
 
